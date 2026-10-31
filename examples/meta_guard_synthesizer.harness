@@ -1,0 +1,36 @@
+// [표준 라이브러리: 메타 가드 합성기]
+import "std/harness_syntax_spec.harness" as SyntaxSpec { weight: 1.0, guards: enforce };
+import "std/safety_heuristics.harness"   as SafetyBase { weight: 0.7, guards: ignore };
+
+agent GuardArchitect {
+    model: "gpt-4o";
+    tolerance: {
+        max_entropy: 0.35;
+        min_confidence: 0.75;
+    };
+}
+
+guard SynthesizedGuardValidator(generated_guard) {
+    // 1계층: 통계적 불확실성 검증
+    assert generated_guard.entropy <= 0.35 
+           on_fail retry("가드 생성 불확실성이 높습니다. 임계치와 불변식을 더 명확히 도출하세요.");
+
+    // 2계층: 위험 키워드 차단
+    assert generated_guard.text !contains "rm -rf" && generated_guard.text !contains "eval(" 
+           on_fail rollback;
+
+    // 3계층: 신뢰도 및 문법 유효성
+    assert generated_guard.confidence >= 0.70 
+           on_fail retry("비즈니스 불변식 신뢰도 부족");
+}
+
+flow SynthesizeSafetyGuard(skill_markdown) {
+    checkpoint baseline;
+
+    state raw_guard ~> GuardArchitect(skill_markdown) 
+                        guided_by (SyntaxSpec * 1.0 + SafetyBase * 0.7);
+
+    enforce SynthesizedGuardValidator(raw_guard);
+
+    commit raw_guard to Tool.GuardRegistry;
+}
