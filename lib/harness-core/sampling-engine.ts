@@ -62,8 +62,10 @@ export class SamplingEngine {
     }
 
     // 정상 수렴 (Pass) 케이스
-    const confidence = Math.min(0.96, 0.78 + retryCount * 0.09);
-    const entropy = Math.max(0.12, 0.42 - retryCount * 0.14);
+    // CLEAN_PASS는 첫 시도부터 임계치(H <= 0.35) 안쪽에서 시작
+    const isClean = scenario === "CLEAN_PASS";
+    const confidence = Math.min(0.96, (isClean ? 0.88 : 0.78) + retryCount * 0.09);
+    const entropy = Math.max(0.12, (isClean ? 0.21 : 0.42) - retryCount * 0.14);
 
     return {
       text: `guard GeneratedSecurityGuard(state) [max_retry: 3] {\n    assert state.entropy <= 0.35 on_fail retry("출력 엔트로피 초과");\n    assert state.text !contains "rm -rf" on_fail rollback;\n    assert state.confidence >= 0.70 on_fail retry("신뢰도 미달");\n}`,

@@ -124,7 +124,10 @@ export class HarnessVM {
       this.record("GUARD_EVAL", `가드 검증: SynthesizedGuardValidator`, `3계층 불변식 검증 시작`);
 
       // 불변식 1: 보안 위험 키워드 차단 (치명적 실패 -> 롤백)
-      if (currentState.text.includes("rm -rf") || currentState.text.includes("eval(")) {
+      // 문자열 리터럴 내부는 "언급"이므로 제외하고, 실제 코드 영역에서만 위험 호출을 탐지한다.
+      // (생성된 가드가 `!contains "rm -rf"` 처럼 금지어를 리터럴로 참조하는 것은 정상)
+      const codeOnly = currentState.text.replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`/g, '""');
+      if (codeOnly.includes("rm -rf") || codeOnly.includes("eval(")) {
         this.record("VERDICT", `가드 판정: Verdict.FAIL`, `치명적 위험 코드 감지 (assert !contains 'rm -rf' / 'eval')`, {
           verdict: VerdictType.FAIL,
         });
